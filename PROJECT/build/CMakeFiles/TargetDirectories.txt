@@ -1,0 +1,3 @@
+C:/Users/Sidra/Desktop/PROJECT/build/CMakeFiles/app_server.dir
+C:/Users/Sidra/Desktop/PROJECT/build/CMakeFiles/edit_cache.dir
+C:/Users/Sidra/Desktop/PROJECT/build/CMakeFiles/rebuild_cache.dir

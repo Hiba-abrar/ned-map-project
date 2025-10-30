@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>NED Navigation GPS Interface</title>
+</head>
+<body>
+    <h2>NED University Navigation System</h2>
+    <div id="status">Requesting location access...</div>
+    <button id="getLocation" onclick="getLocation()">Enable GPS Location</button>
+    <div id="coordinates" style="display:none;">
+        <p>Latitude: <span id="lat"></span></p>
+        <p>Longitude: <span id="lon"></span></p>
+        <button onclick="sendToApp()">Start Navigation</button>
+    </div>
+    <div id="manual" style="display:none;">
+        <h3>Manual Entry (GPS not available)</h3>
+        <input type="number" id="manualLat" placeholder="Latitude" step="any">
+        <input type="number" id="manualLon" placeholder="Longitude" step="any">
+        <button onclick="useManualCoords()">Use Manual Coordinates</button>
+    </div>
+
+    <script>
+        let currentLat, currentLon;
+
+        function getLocation() {
+            if (navigator.geolocation) {
+                document.getElementById("status").innerHTML = "Requesting GPS access...";
+                navigator.geolocation.getCurrentPosition(showPosition, showError, {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 0
+                });
+            } else {
+                document.getElementById("status").innerHTML = "Geolocation not supported";
+                showManualEntry();
+            }
+        }
+
+        function showPosition(position) {
+            currentLat = position.coords.latitude;
+            currentLon = position.coords.longitude;
+            
+            document.getElementById("lat").innerHTML = currentLat;
+            document.getElementById("lon").innerHTML = currentLon;
+            document.getElementById("status").innerHTML = "GPS location detected!";
+            document.getElementById("coordinates").style.display = "block";
+            document.getElementById("getLocation").style.display = "none";
+        }
+
+        function showError(error) {
+            let message = "";
+            switch(error.code) {
+                case error.PERMISSION_DENIED:
+                    message = "Location access denied by user.";
+                    break;
+                case error.POSITION_UNAVAILABLE:
+                    message = "Location information unavailable.";
+                    break;
+                case error.TIMEOUT:
+                    message = "Location request timed out.";
+                    break;
+                default:
+                    message = "An unknown error occurred.";
+                    break;
+            }
+            document.getElementById("status").innerHTML = message;
+            showManualEntry();
+        }
+
+        function showManualEntry() {
+            document.getElementById("manual").style.display = "block";
+            document.getElementById("getLocation").style.display = "none";
+        }
+
+        function useManualCoords() {
+            currentLat = document.getElementById("manualLat").value;
+            currentLon = document.getElementById("manualLon").value;
+            if (currentLat && currentLon) {
+                sendToApp();
+            } else {
+                alert("Please enter both latitude and longitude");
+            }
+        }
+
+        function sendToApp() {
+            // Send coordinates to C++ app via file or HTTP
+            fetch('http://localhost:8080/gps', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({lat: currentLat, lon: currentLon})
+            }).then(() => {
+                document.getElementById("status").innerHTML = "Coordinates sent to navigation app!";
+            }).catch(() => {
+                // Fallback: write to file
+                let coords = currentLat + "," + currentLon;
+                let blob = new Blob([coords], {type: 'text/plain'});
+                let url = window.URL.createObjectURL(blob);
+                let a = document.createElement('a');
+                a.href = url;
+                a.download = 'gps_coords.txt';
+                a.click();
+                document.getElementById("status").innerHTML = "Coordinates saved to file!";
+            });
+        }
+
+        // Auto-start GPS detection
+        window.onload = function() {
+            getLocation();
+        };
+    </script>
+</body>
+</html>

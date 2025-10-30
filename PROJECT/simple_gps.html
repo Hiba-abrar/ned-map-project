@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>NED Navigation GPS</title>
+</head>
+<body>
+    <h2>NED University Navigation</h2>
+    <div id="status">Getting your location...</div>
+    <div id="result" style="display:none;">
+        <p>Location: <span id="coords"></span></p>
+        <p>Copy these coordinates and paste them into your C++ app:</p>
+        <input type="text" id="copyCoords" readonly style="width:300px;">
+        <button onclick="copyToClipboard()">Copy</button>
+    </div>
+
+    <script>
+        window.onload = function() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(function(position) {
+                    let lat = position.coords.latitude;
+                    let lon = position.coords.longitude;
+                    
+                    document.getElementById("coords").innerHTML = lat + ", " + lon;
+                    document.getElementById("copyCoords").value = lat + "," + lon;
+                    document.getElementById("status").innerHTML = "GPS location detected!";
+                    document.getElementById("result").style.display = "block";
+                }, function(error) {
+                    document.getElementById("status").innerHTML = "GPS failed. Please enter coordinates manually in the C++ app.";
+                });
+            } else {
+                document.getElementById("status").innerHTML = "GPS not supported. Use manual entry in C++ app.";
+            }
+        };
+
+        function copyToClipboard() {
+            document.getElementById("copyCoords").select();
+            document.execCommand("copy");
+            alert("Coordinates copied! Paste them in your C++ app.");
+        }
+    </script>
+</body>
+</html>

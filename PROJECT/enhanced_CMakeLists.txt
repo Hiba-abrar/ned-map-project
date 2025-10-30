@@ -1,0 +1,29 @@
+cmake_minimum_required(VERSION 3.10)
+project(EnhancedNEDNavigator)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Find required packages
+find_package(Threads REQUIRED)
+
+# Add executable
+add_executable(enhanced_navigator enhanced_main.cpp)
+
+# Link libraries
+target_link_libraries(enhanced_navigator Threads::Threads)
+
+# Platform-specific libraries
+if(WIN32)
+    target_link_libraries(enhanced_navigator ws2_32 wsock32)
+endif()
+
+# Set output directory
+set_target_properties(enhanced_navigator PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}
+)
+
+# Copy static files to build directory
+configure_file(${CMAKE_SOURCE_DIR}/enhanced_navigator.html ${CMAKE_BINARY_DIR}/enhanced_navigator.html COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/simple_server.h ${CMAKE_BINARY_DIR}/simple_server.h COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/json.hpp ${CMAKE_BINARY_DIR}/json.hpp COPYONLY)

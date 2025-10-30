@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NED Campus Navigator</title>
+
+  <!-- Leaflet CSS -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
+
+  <!-- Our CSS -->
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="layout">
+    <!-- Left side panel -->
+    <aside id="panel">
+      <h1>NED Navigation</h1>
+
+      <label for="startInput">Start location</label>
+      <input
+        id="startInput"
+        list="locationList"
+        placeholder="e.g. NED University Main Gate"
+      />
+
+      <label for="destInput">Destination</label>
+      <input
+        id="destInput"
+        list="locationList"
+        placeholder="e.g. NED University Library"
+      />
+
+      <!-- We'll fill this later with real location names -->
+      <datalist id="locationList"></datalist>
+
+      <div class="row">
+        <button id="routeBtn">Find Route</button>
+        <button id="clearBtn">Clear</button>
+      </div>
+
+      <div class="row">
+        <button id="voiceBtn">🎤 Voice Input</button>
+        <small id="voiceStatus" class="muted"></small>
+      </div>
+
+      <hr />
+
+      <h2>Guidance</h2>
+      <div id="stepsBox"></div>
+
+      <div class="row">
+        <button id="speakStepBtn">🔊 Speak Current Step</button>
+        <button id="nextStepBtn">Next ▶</button>
+      </div>
+    </aside>
+
+    <!-- Right side map -->
+    <main id="mapContainer">
+      <div id="map"></div>
+    </main>
+  </div>
+
+  <!-- Leaflet JS -->
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+  ></script>
+
+  <!-- Our logic -->
+  <script src="script.js"></script>
+</body>
+</html>

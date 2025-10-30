@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>NED Campus Navigator - Enhanced</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
+    <style>
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            margin: 0; 
+            padding: 0; 
+            background: #f5f5f5;
+        }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        .header { text-align: center; margin-bottom: 20px; }
+        .status-panel { 
+            background: white; 
+            padding: 20px; 
+            border-radius: 10px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .controls { 
+            display: flex; 
+            gap: 10px; 
+            flex-wrap: wrap; 
+            margin-bottom: 20px;
+        }
+        input, button, select { 
+            padding: 12px; 
+            border: 2px solid #ddd; 
+            border-radius: 8px; 
+            font-size: 14px;
+        }
+        button { 
+            background: #007cba; 
+            color: white; 
+            border: none; 
+            cursor: pointer; 
+            transition: all 0.3s;
+        }
+        button:hover { background: #005a87; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        .voice-btn { background: #28a745; }
+        .voice-btn:hover { background: #218838; }
+        .gps-btn { background: #17a2b8; }
+        .gps-btn:hover { background: #138496; }
+        #map { 
+            height: 500px; 
+            width: 100%; 
+            border-radius: 10px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .navigation-panel { 
+            background: white; 
+            padding: 20px; 
+            border-radius: 10px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-top: 20px;
+        }
+        .step { 
+            padding: 15px; 
+            margin: 10px 0; 
+            background: #f8f9fa; 
+            border-left: 4px solid #007cba; 
+            border-radius: 5px;
+        }
+        .step.current { 
+            background: #e3f2fd; 
+            border-left-color: #2196f3; 
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(33, 150, 243, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(33, 150, 243, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(33, 150, 243, 0); }
+        }
+        .voice-controls { 
+            display: flex; 
+            gap: 10px; 
+            margin-top: 15px;
+        }
+        .listening { 
+            background: #dc3545 !important; 
+            animation: blink 1s infinite;
+        }
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0.5; }
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+        .modal-content {
+            background-color: white;
+            margin: 15% auto;
+            padding: 30px;
+            border-radius: 10px;
+            width: 80%;
+            max-width: 500px;
+            text-align: center;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #e0e0e0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #007cba, #28a745);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧭 NED Campus Navigator</h1>
+            <p>Advanced GPS Navigation with Voice Commands</p>
+        </div>
+
+        <div class="status-panel">
+            <h3>📍 Location Setup</h3>
+            <div class="controls">
+                <button id="gpsBtn" class="gps-btn" onclick="requestGPS()">📡 Use GPS Location</button>
+                <button onclick="showManualInput()">📝 Manual Coordinates</button>
+                <button onclick="showLocationMenu()">🏢 Select Department</button>
+            </div>
+            <div id="locationStatus">Click a button above to set your starting location</div>
+        </div>
+
+        <div class="controls">
+            <input type="text" id="startCoords" placeholder="Current Location" readonly>
+            <input type="text" id="destination" placeholder="Enter destination" list="locations">
+            <button onclick="findRoute()">🗺️ Find Route</button>
+            <button onclick="clearAll()">🗑️ Clear</button>
+        </div>
+
+        <datalist id="locations">
+            <option value="NED University Main Gate">
+            <option value="NED University Library">
+            <option value="NED University Admin Block">
+            <option value="CSIT Labs">
+            <option value="Main Auditorium">
+            <option value="DMS Cafeteria">
+            <option value="Civil Engineering Class Rooms">
+            <option value="Survey Lab">
+            <option value="Mosque">
+            <option value="Basketball Court">
+            <option value="Tennis Court">
+            <option value="Football Ground">
+            <option value="Mathematics Department">
+            <option value="Mechanical Engineering Department">
+            <option value="Environmental Engineering">
+            <option value="Electrical Engineering Department">
+        </datalist>
+
+        <div id="map"></div>
+
+        <div class="navigation-panel" id="navigationPanel" style="display: none;">
+            <h3>🎯 Navigation Instructions</h3>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <div id="currentStep"></div>
+            <div id="allSteps"></div>
+            <div class="voice-controls">
+                <button id="voiceBtn" class="voice-btn" onclick="toggleVoiceControl()">🎤 Voice Control</button>
+                <button onclick="nextStep()">⏭️ Next</button>
+                <button onclick="repeatStep()">🔄 Repeat</button>
+                <button onclick="previousStep()">⏮️ Previous</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- GPS Permission Modal -->
+    <div id="gpsModal" class="modal">
+        <div class="modal-content">
+            <h3>🌍 GPS Location Access</h3>
+            <p>Would you like to allow GPS access to automatically set your current location?</p>
+            <button onclick="allowGPS()" class="gps-btn">✅ Yes, Allow GPS</button>
+            <button onclick="denyGPS()">❌ No, Manual Input</button>
+        </div>
+    </div>
+
+    <!-- Manual Input Modal -->
+    <div id="manualModal" class="modal">
+        <div class="modal-content">
+            <h3>📝 Manual Coordinates</h3>
+            <p>Enter your current coordinates:</p>
+            <input type="number" id="manualLat" placeholder="Latitude (e.g., 24.9325)" step="0.000001">
+            <input type="number" id="manualLon" placeholder="Longitude (e.g., 67.1139)" step="0.000001">
+            <br><br>
+            <button onclick="setManualLocation()">📍 Set Location</button>
+            <button onclick="closeModal('manualModal')">❌ Cancel</button>
+        </div>
+    </div>
+
+    <!-- Department Selection Modal -->
+    <div id="departmentModal" class="modal">
+        <div class="modal-content">
+            <h3>🏢 Select Starting Department</h3>
+            <select id="departmentSelect" size="8" style="width: 100%; margin: 10px 0;">
+                <option value="NED University Main Gate">🚪 Main Gate</option>
+                <option value="NED University Library">📚 Library</option>
+                <option value="NED University Admin Block">🏛️ Admin Block</option>
+                <option value="CSIT Labs">💻 CSIT Labs</option>
+                <option value="Main Auditorium">🎭 Main Auditorium</option>
+                <option value="DMS Cafeteria">🍽️ DMS Cafeteria</option>
+                <option value="Civil Engineering Class Rooms">🏗️ Civil Engineering</option>
+                <option value="Mathematics Department">📐 Mathematics Dept</option>
+                <option value="Mechanical Engineering Department">⚙️ Mechanical Dept</option>
+                <option value="Electrical Engineering Department">⚡ Electrical Dept</option>
+            </select>
+            <button onclick="setDepartmentLocation()">📍 Select This Location</button>
+            <button onclick="closeModal('departmentModal')">❌ Cancel</button>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+    <script>
+        // Global variables
+        let map, currentLocation = null, destination = null;
+        let routeControl = null, currentStepIndex = 0, routeSteps = [];
+        let recognition = null, isListening = false;
+        let currentLocationMarker = null, destinationMarker = null;
+
+        // Location database
+        const locations = {
+            "NED University Main Gate": [24.9299167, 67.1156389],
+            "NED University Library": [24.9335294, 67.1110976],
+            "NED University Admin Block": [24.9328525, 67.1099341],
+            "CSIT Labs": [24.9313470, 67.1139814],
+            "Main Auditorium": [24.9320192, 67.1125931],
+            "DMS Cafeteria": [24.9326224, 67.1144837],
+            "Civil Engineering Class Rooms": [24.9313328, 67.1126852],
+            "Survey Lab": [24.9318691, 67.1135877],
+            "Mosque": [24.9344365, 67.1109842],
+            "Basketball Court": [24.9325, 67.1164],
+            "Tennis Court": [24.9326117, 67.1163778],
+            "Football Ground": [24.9315048, 67.1166501],
+            "Mathematics Department": [24.9309500, 67.1139000],
+            "Mechanical Engineering Department": [24.9317800, 67.1120400],
+            "Environmental Engineering": [24.9345252, 67.1125900],
+            "Electrical Engineering Department": [24.9326500, 67.1124000]
+        };
+
+        // Initialize map
+        function initMap() {
+            map = L.map('map').setView([24.9325, 67.1139], 16);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+
+            // Add location markers
+            Object.entries(locations).forEach(([name, coords]) => {
+                L.marker(coords)
+                    .addTo(map)
+                    .bindPopup(`<b>${name}</b><br>Lat: ${coords[0]}<br>Lon: ${coords[1]}`);
+            });
+        }
+
+        // Initialize speech recognition
+        function initSpeechRecognition() {
+            if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                recognition = new SpeechRecognition();
+                recognition.continuous = true;
+                recognition.interimResults = false;
+                recognition.lang = 'en-US';
+
+                recognition.onstart = () => {
+                    isListening = true;
+                    document.getElementById('voiceBtn').classList.add('listening');
+                    document.getElementById('voiceBtn').textContent = '🔴 Listening...';
+                };
+
+                recognition.onend = () => {
+                    isListening = false;
+                    document.getElementById('voiceBtn').classList.remove('listening');
+                    document.getElementById('voiceBtn').textContent = '🎤 Voice Control';
+                };
+
+                recognition.onresult = (event) => {
+                    const transcript = event.results[event.results.length - 1][0].transcript.toLowerCase().trim();
+                    console.log('Voice command:', transcript);
+                    processVoiceCommand(transcript);
+                };
+
+                recognition.onerror = (event) => {
+                    console.error('Speech recognition error:', event.error);
+                    speak('Sorry, I could not understand that. Please try again.');
+                };
+            }
+        }
+
+        // Process voice commands
+        function processVoiceCommand(command) {
+            if (command.includes('next') || command.includes('continue')) {
+                nextStep();
+            } else if (command.includes('repeat') || command.includes('again')) {
+                repeatStep();
+            } else if (command.includes('previous') || command.includes('back')) {
+                previousStep();
+            } else if (command.includes('yes') || command.includes('allow')) {
+                allowGPS();
+            } else if (command.includes('no') || command.includes('deny')) {
+                denyGPS();
+            } else {
+                // Try to parse destination
+                const destMatch = findLocationMatch(command);
+                if (destMatch) {
+                    document.getElementById('destination').value = destMatch;
+                    speak(`Destination set to ${destMatch}`);
+                }
+            }
+        }
+
+        // Find location match from voice input
+        function findLocationMatch(input) {
+            const words = input.split(' ');
+            for (const [name, coords] of Object.entries(locations)) {
+                const nameWords = name.toLowerCase().split(' ');
+                let matches = 0;
+                for (const word of words) {
+                    if (nameWords.some(nw => nw.includes(word) || word.includes(nw))) {
+                        matches++;
+                    }
+                }
+                if (matches >= 2) return name;
+            }
+            return null;
+        }
+
+        // Text-to-speech function
+        function speak(text) {
+            if ('speechSynthesis' in window) {
+                speechSynthesis.cancel(); // Cancel any ongoing speech
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.rate = 0.9;
+                utterance.pitch = 1;
+                utterance.volume = 1;
+                speechSynthesis.speak(utterance);
+            }
+            console.log('TTS:', text);
+        }
+
+        // GPS functions
+        function requestGPS() {
+            document.getElementById('gpsModal').style.display = 'block';
+            speak('Would you like to allow GPS access to automatically set your current location?');
+        }
+
+        function allowGPS() {
+            closeModal('gpsModal');
+            if ('geolocation' in navigator) {
+                speak('Getting your GPS location...');
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        const lat = position.coords.latitude;
+                        const lon = position.coords.longitude;
+                        setCurrentLocation(lat, lon, 'GPS Location');
+                        speak('GPS location set successfully');
+                    },
+                    (error) => {
+                        console.error('GPS error:', error);
+                        speak('GPS access failed. Please try manual input.');
+                        showManualInput();
+                    },
+                    { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+                );
+            } else {
+                speak('GPS is not available on this device');
+                showManualInput();
+            }
+        }
+
+        function denyGPS() {
+            closeModal('gpsModal');
+            speak('Please choose manual coordinates or select a department');
+            showManualInput();
+        }
+
+        // Manual input functions
+        function showManualInput() {
+            document.getElementById('manualModal').style.display = 'block';
+            speak('Please enter your latitude and longitude coordinates');
+        }
+
+        function setManualLocation() {
+            const lat = parseFloat(document.getElementById('manualLat').value);
+            const lon = parseFloat(document.getElementById('manualLon').value);
+            
+            if (isNaN(lat) || isNaN(lon)) {
+                speak('Please enter valid coordinates');
+                return;
+            }
+            
+            if (lat < 24.92 || lat > 24.94 || lon < 67.10 || lon > 67.12) {
+                speak('Coordinates are outside NED University campus');
+                return;
+            }
+            
+            setCurrentLocation(lat, lon, 'Manual Location');
+            closeModal('manualModal');
+            speak('Manual location set successfully');
+        }
+
+        // Department selection functions
+        function showLocationMenu() {
+            document.getElementById('departmentModal').style.display = 'block';
+            speak('Please select your starting department from the list');
+        }
+
+        function setDepartmentLocation() {
+            const selected = document.getElementById('departmentSelect').value;
+            if (selected && locations[selected]) {
+                const coords = locations[selected];
+                setCurrentLocation(coords[0], coords[1], selected);
+                closeModal('departmentModal');
+                speak(`Starting location set to ${selected}`);
+            }
+        }
+
+        // Set current location
+        function setCurrentLocation(lat, lon, name) {
+            currentLocation = [lat, lon];
+            document.getElementById('startCoords').value = `${name} (${lat.toFixed(6)}, ${lon.toFixed(6)})`;
+            document.getElementById('locationStatus').innerHTML = `✅ Current location: ${name}`;
+            
+            // Add/update current location marker
+            if (currentLocationMarker) {
+                map.removeLayer(currentLocationMarker);
+            }
+            
+            currentLocationMarker = L.marker([lat, lon], {
+                icon: L.icon({
+                    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
+                    iconSize: [25, 41],
+                    iconAnchor: [12, 41]
+                })
+            }).addTo(map).bindPopup(`📍 Current Location: ${name}`);
+            
+            map.setView([lat, lon], 17);
+            
+            // Ask for destination
+            setTimeout(() => {
+                speak('Now please enter your destination');
+                document.getElementById('destination').focus();
+            }, 1000);
+        }
+
+        // Route finding
+        function findRoute() {
+            if (!currentLocation) {
+                speak('Please set your starting location first');
+                return;
+            }
+            
+            const destName = document.getElementById('destination').value.trim();
+            if (!destName) {
+                speak('Please enter a destination');
+                return;
+            }
+            
+            // Find destination coordinates
+            let destCoords = locations[destName];
+            if (!destCoords) {
+                // Try fuzzy matching
+                const match = findLocationMatch(destName.toLowerCase());
+                if (match) {
+                    destCoords = locations[match];
+                    document.getElementById('destination').value = match;
+                } else {
+                    speak('Destination not found. Please select from the list.');
+                    return;
+                }
+            }
+            
+            destination = destCoords;
+            
+            // Clear previous route
+            if (routeControl) {
+                map.removeControl(routeControl);
+            }
+            
+            // Create routing control with waypoints for realistic paths
+            const waypoints = generateWaypoints(currentLocation, destination);
+            
+            routeControl = L.Routing.control({
+                waypoints: waypoints,
+                routeWhileDragging: false,
+                addWaypoints: false,
+                createMarker: function() { return null; }, // We'll handle markers ourselves
+                lineOptions: {
+                    styles: [
+                        { color: '#007cba', weight: 8, opacity: 0.8 },
+                        { color: '#ffffff', weight: 4, opacity: 1 }
+                    ]
+                }
+            }).on('routesfound', function(e) {
+                const routes = e.routes;
+                const summary = routes[0].summary;
+                routeSteps = generateDetailedSteps(routes[0]);
+                
+                speak(`Route found! Total distance: ${Math.round(summary.totalDistance)} meters. Starting navigation.`);
+                showNavigation();
+                currentStepIndex = 0;
+                showCurrentStep();
+            }).addTo(map);
+            
+            // Add destination marker
+            if (destinationMarker) {
+                map.removeLayer(destinationMarker);
+            }
+            
+            destinationMarker = L.marker(destination, {
+                icon: L.icon({
+                    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+                    iconSize: [25, 41],
+                    iconAnchor: [12, 41]
+                })
+            }).addTo(map).bindPopup(`🎯 Destination: ${destName}`);
+        }
+
+        // Generate waypoints for more realistic routing
+        function generateWaypoints(start, end) {
+            const waypoints = [L.latLng(start[0], start[1])];
+            
+            // Add intermediate waypoints based on campus layout
+            const midLat = (start[0] + end[0]) / 2;
+            const midLon = (start[1] + end[1]) / 2;
+            
+            // Add waypoint near main roads if path is long
+            const distance = Math.sqrt(Math.pow(end[0] - start[0], 2) + Math.pow(end[1] - start[1], 2));
+            if (distance > 0.002) { // If distance > ~200m
+                waypoints.push(L.latLng(midLat, midLon));
+            }
+            
+            waypoints.push(L.latLng(end[0], end[1]));
+            return waypoints;
+        }
+
+        // Generate detailed navigation steps
+        function generateDetailedSteps(route) {
+            const instructions = route.instructions;
+            const steps = [];
+            
+            instructions.forEach((instruction, index) => {
+                let direction = 'Continue';
+                let icon = '➡️';
+                
+                if (instruction.type === 'Head') {
+                    direction = 'Head';
+                    icon = '🚀';
+                } else if (instruction.type === 'Right') {
+                    direction = 'Turn right';
+                    icon = '↗️';
+                } else if (instruction.type === 'Left') {
+                    direction = 'Turn left';
+                    icon = '↖️';
+                } else if (instruction.type === 'Straight') {
+                    direction = 'Continue straight';
+                    icon = '⬆️';
+                } else if (instruction.type === 'DestinationReached') {
+                    direction = 'You have arrived';
+                    icon = '🎯';
+                }
+                
+                steps.push({
+                    instruction: `${direction} for ${Math.round(instruction.distance)} meters`,
+                    distance: Math.round(instruction.distance),
+                    icon: icon,
+                    text: instruction.text || `${direction} for ${Math.round(instruction.distance)} meters`
+                });
+            });
+            
+            return steps;
+        }
+
+        // Navigation functions
+        function showNavigation() {
+            document.getElementById('navigationPanel').style.display = 'block';
+            updateProgress();
+        }
+
+        function showCurrentStep() {
+            if (currentStepIndex >= routeSteps.length) {
+                speak('You have arrived at your destination!');
+                return;
+            }
+            
+            const step = routeSteps[currentStepIndex];
+            const stepHtml = `
+                <div class="step current">
+                    <h4>${step.icon} Step ${currentStepIndex + 1} of ${routeSteps.length}</h4>
+                    <p><strong>${step.instruction}</strong></p>
+                </div>
+            `;
+            
+            document.getElementById('currentStep').innerHTML = stepHtml;
+            
+            // Show all steps with current highlighted
+            let allStepsHtml = '';
+            routeSteps.forEach((s, index) => {
+                const className = index === currentStepIndex ? 'step current' : 'step';
+                allStepsHtml += `
+                    <div class="${className}">
+                        <strong>${s.icon} ${s.instruction}</strong>
+                    </div>
+                `;
+            });
+            document.getElementById('allSteps').innerHTML = allStepsHtml;
+            
+            updateProgress();
+            speak(step.instruction);
+        }
+
+        function nextStep() {
+            if (currentStepIndex < routeSteps.length - 1) {
+                currentStepIndex++;
+                showCurrentStep();
+            } else {
+                speak('You have reached your destination!');
+            }
+        }
+
+        function previousStep() {
+            if (currentStepIndex > 0) {
+                currentStepIndex--;
+                showCurrentStep();
+            }
+        }
+
+        function repeatStep() {
+            if (routeSteps.length > 0) {
+                const step = routeSteps[currentStepIndex];
+                speak(step.instruction);
+            }
+        }
+
+        function updateProgress() {
+            const progress = ((currentStepIndex + 1) / routeSteps.length) * 100;
+            document.getElementById('progressFill').style.width = progress + '%';
+        }
+
+        // Voice control toggle
+        function toggleVoiceControl() {
+            if (!recognition) {
+                speak('Voice recognition is not available');
+                return;
+            }
+            
+            if (isListening) {
+                recognition.stop();
+            } else {
+                recognition.start();
+            }
+        }
+
+        // Utility functions
+        function closeModal(modalId) {
+            document.getElementById(modalId).style.display = 'none';
+        }
+
+        function clearAll() {
+            if (routeControl) {
+                map.removeControl(routeControl);
+                routeControl = null;
+            }
+            if (currentLocationMarker) {
+                map.removeLayer(currentLocationMarker);
+                currentLocationMarker = null;
+            }
+            if (destinationMarker) {
+                map.removeLayer(destinationMarker);
+                destinationMarker = null;
+            }
+            
+            currentLocation = null;
+            destination = null;
+            routeSteps = [];
+            currentStepIndex = 0;
+            
+            document.getElementById('startCoords').value = '';
+            document.getElementById('destination').value = '';
+            document.getElementById('locationStatus').innerHTML = 'Click a button above to set your starting location';
+            document.getElementById('navigationPanel').style.display = 'none';
+            
+            map.setView([24.9325, 67.1139], 16);
+            speak('Navigation cleared');
+        }
+
+        // Initialize everything when page loads
+        window.onload = function() {
+            initMap();
+            initSpeechRecognition();
+            
+            // Auto-request GPS on load
+            setTimeout(() => {
+                speak('Welcome to NED Campus Navigator!');
+                setTimeout(() => {
+                    requestGPS();
+                }, 2000);
+            }, 1000);
+        };
+
+        // Close modals when clicking outside
+        window.onclick = function(event) {
+            const modals = document.querySelectorAll('.modal');
+            modals.forEach(modal => {
+                if (event.target === modal) {
+                    modal.style.display = 'none';
+                }
+            });
+        };
+    </script>
+</body>
+</html>

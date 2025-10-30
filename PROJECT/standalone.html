@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>NED Campus Navigator</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; }
+        #map { height: 400px; width: 100%; margin: 20px 0; }
+        .controls { margin: 10px 0; }
+        input, button { padding: 10px; margin: 5px; }
+        button { background: #007cba; color: white; border: none; cursor: pointer; }
+        button:hover { background: #005a87; }
+        #result { margin: 20px 0; padding: 10px; background: #f0f0f0; }
+    </style>
+</head>
+<body>
+    <h1>NED Campus Navigator</h1>
+    
+    <div class="controls">
+        <input type="text" id="start" placeholder="Start location" list="locations">
+        <input type="text" id="end" placeholder="End location" list="locations">
+        <button onclick="findRoute()">Find Route</button>
+        <button onclick="clearRoute()">Clear</button>
+    </div>
+    
+    <datalist id="locations">
+        <option value="NED University Main Gate">
+        <option value="NED University Library">
+        <option value="NED University Admin Block">
+        <option value="CSIT Labs">
+        <option value="Main Auditorium">
+        <option value="DMS Cafeteria">
+        <option value="Civil Engineering Class Rooms">
+        <option value="Survey Lab">
+        <option value="Mosque">
+        <option value="Basketball Court">
+        <option value="Tennis Court">
+        <option value="Football Ground">
+    </datalist>
+    
+    <div id="map"></div>
+    <div id="result"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        const locations = {
+            "NED University Main Gate": [24.9299167, 67.1156389],
+            "NED University Library": [24.9335294, 67.1110976],
+            "NED University Admin Block": [24.9328525, 67.1099341],
+            "CSIT Labs": [24.9313470, 67.1139814],
+            "Main Auditorium": [24.9320192, 67.1125931],
+            "DMS Cafeteria": [24.9326224, 67.1144837],
+            "Civil Engineering Class Rooms": [24.9313328, 67.1126852],
+            "Survey Lab": [24.9318691, 67.1135877],
+            "Mosque": [24.9344365, 67.1109842],
+            "Basketball Court": [24.9325, 67.1164],
+            "Tennis Court": [24.9326117, 67.1163778],
+            "Football Ground": [24.9315048, 67.1166501]
+        };
+
+        let map = L.map('map').setView([24.9325, 67.1139], 16);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+        
+        let routeLine = null;
+        let startMarker = null;
+        let endMarker = null;
+
+        // Add location markers
+        Object.entries(locations).forEach(([name, coords]) => {
+            L.marker(coords).addTo(map).bindPopup(name);
+        });
+
+        function distance(lat1, lon1, lat2, lon2) {
+            const dx = (lat1 - lat2) * 111000;
+            const dy = (lon1 - lon2) * 111000;
+            return Math.sqrt(dx*dx + dy*dy);
+        }
+
+        function findRoute() {
+            const start = document.getElementById('start').value;
+            const end = document.getElementById('end').value;
+            
+            if (!locations[start] || !locations[end]) {
+                document.getElementById('result').innerHTML = '<p style="color:red">Invalid locations selected</p>';
+                return;
+            }
+
+            const startCoords = locations[start];
+            const endCoords = locations[end];
+            const dist = Math.round(distance(startCoords[0], startCoords[1], endCoords[0], endCoords[1]));
+
+            // Clear previous route
+            clearRoute();
+
+            // Add markers
+            startMarker = L.marker(startCoords, {
+                icon: L.icon({
+                    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
+                    iconSize: [25, 41],
+                    iconAnchor: [12, 41]
+                })
+            }).addTo(map).bindPopup('Start: ' + start);
+
+            endMarker = L.marker(endCoords, {
+                icon: L.icon({
+                    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+                    iconSize: [25, 41],
+                    iconAnchor: [12, 41]
+                })
+            }).addTo(map).bindPopup('End: ' + end);
+
+            // Draw route line
+            routeLine = L.polyline([startCoords, endCoords], {color: 'red', weight: 4}).addTo(map);
+            
+            // Fit map to route
+            map.fitBounds(routeLine.getBounds(), {padding: [20, 20]});
+
+            // Show result
+            document.getElementById('result').innerHTML = `
+                <h3>Route Found!</h3>
+                <p><strong>From:</strong> ${start}</p>
+                <p><strong>To:</strong> ${end}</p>
+                <p><strong>Distance:</strong> ${dist} meters</p>
+                <p><strong>Direction:</strong> Head directly to ${end}</p>
+            `;
+
+            // Text-to-speech
+            if ('speechSynthesis' in window) {
+                const utterance = new SpeechSynthesisUtterance(`Route found from ${start} to ${end}. Distance is ${dist} meters.`);
+                speechSynthesis.speak(utterance);
+            }
+        }
+
+        function clearRoute() {
+            if (routeLine) map.removeLayer(routeLine);
+            if (startMarker) map.removeLayer(startMarker);
+            if (endMarker) map.removeLayer(endMarker);
+            document.getElementById('start').value = '';
+            document.getElementById('end').value = '';
+            document.getElementById('result').innerHTML = '';
+            map.setView([24.9325, 67.1139], 16);
+        }
+
+        // Voice recognition
+        if ('webkitSpeechRecognition' in window) {
+            const recognition = new webkitSpeechRecognition();
+            recognition.continuous = false;
+            recognition.interimResults = false;
+
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'v' && e.ctrlKey) {
+                    recognition.start();
+                }
+            });
+
+            recognition.onresult = function(event) {
+                const transcript = event.results[0][0].transcript.toLowerCase();
+                console.log('Voice:', transcript);
+                
+                // Simple voice parsing
+                const words = transcript.split(' ');
+                const fromIndex = words.indexOf('from');
+                const toIndex = words.indexOf('to');
+                
+                if (fromIndex !== -1 && toIndex !== -1) {
+                    const startLoc = words.slice(fromIndex + 1, toIndex).join(' ');
+                    const endLoc = words.slice(toIndex + 1).join(' ');
+                    
+                    // Find closest matching locations
+                    const startMatch = Object.keys(locations).find(loc => 
+                        loc.toLowerCase().includes(startLoc) || startLoc.includes(loc.toLowerCase())
+                    );
+                    const endMatch = Object.keys(locations).find(loc => 
+                        loc.toLowerCase().includes(endLoc) || endLoc.includes(loc.toLowerCase())
+                    );
+                    
+                    if (startMatch) document.getElementById('start').value = startMatch;
+                    if (endMatch) document.getElementById('end').value = endMatch;
+                    
+                    if (startMatch && endMatch) {
+                        setTimeout(findRoute, 500);
+                    }
+                }
+            };
+        }
+    </script>
+
+    <p><small>Press Ctrl+V for voice input. Say "navigate from [location] to [location]"</small></p>
+</body>
+</html>
